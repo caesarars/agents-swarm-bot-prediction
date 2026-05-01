@@ -25,6 +25,8 @@ data pasar Binance dan referensi pasar prediksi **Polymarket**.
 4. Hasil diagregasi (UP/DOWN/ABSTAIN, avg confidence, breakdown per kategori) dan disimpan.
 5. Setiap menit, scheduler menyelesaikan ronde yang `target_at`-nya sudah lewat dengan
    membandingkan harga aktual ⇒ menulis `actual_outcome` & `is_correct` (live backtest).
+6. Backtesting harness dapat dijalankan on-demand terhadap candle historis 1m Binance tanpa
+   memanggil DeepSeek, memakai proxy sinyal teknikal deterministik untuk validasi cepat.
 
 ## 100 Agent — 10 lensa × 10 spesialis
 Lihat [`backend/app/agents.py`](backend/app/agents.py). Kelompok:
@@ -63,10 +65,18 @@ Endpoint penting:
 - `GET /api/predictions/history?limit=50`
 - `GET /api/predictions/{id}/votes`
 - `GET /api/stats`
+- `GET /api/backtest?lookback=240&horizon_minutes=5&threshold_bps=0&fee_bps=0`
 - `GET /api/market/snapshot`
 - `GET /api/polymarket/btc`
 - `POST /api/predict/run` — jalankan ronde manual (gunakan untuk first-run sebelum 5 menit pertama)
 - `POST /api/predict/settle` — selesaikan ronde yang target_at-nya sudah lewat
+
+Backtesting harness mengembalikan metrik `accuracy`, `coverage`, `cumulative_return_bps`,
+`max_drawdown_bps`, `profit_factor`, dan 100 baris hasil terbaru. Parameter:
+- `lookback` — jumlah candle 1m yang dievaluasi, 20-900.
+- `horizon_minutes` — jarak target harga, default 5 menit.
+- `threshold_bps` — zona netral untuk actual outcome; `0` berarti semua pergerakan dihitung.
+- `fee_bps` — biaya per trade simulasi dalam basis point.
 
 ### 2. Frontend
 ```bash

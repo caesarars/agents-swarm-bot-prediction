@@ -7,7 +7,7 @@ from sqlalchemy import desc, func, select
 
 from ..agents import get_all_agents
 from ..database import AgentVote, Prediction, get_session_maker
-from ..services import market, polymarket, prediction
+from ..services import backtest, market, polymarket, prediction
 
 router = APIRouter()
 
@@ -120,6 +120,28 @@ async def stats() -> dict[str, Any]:
             "correct_predictions": correct,
             "accuracy": accuracy,
         }
+
+
+@router.get("/backtest")
+async def backtest_harness(
+    symbol: str = Query("BTCUSDT", min_length=3, max_length=20),
+    lookback: int = Query(240, ge=20, le=900),
+    horizon_minutes: int = Query(5, ge=1, le=30),
+    threshold_bps: float = Query(0.0, ge=0.0, le=100.0),
+    fee_bps: float = Query(0.0, ge=0.0, le=100.0),
+) -> dict[str, Any]:
+    try:
+        return await backtest.run_backtest(
+            symbol=symbol,
+            lookback=lookback,
+            horizon_minutes=horizon_minutes,
+            threshold_bps=threshold_bps,
+            fee_bps=fee_bps,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"backtest failed: {e}") from e
 
 
 @router.post("/predict/run")

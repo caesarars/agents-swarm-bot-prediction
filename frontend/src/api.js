@@ -20,6 +20,11 @@ export const api = {
   stats: () => getJson('/stats'),
   snapshot: () => getJson('/market/snapshot'),
   polymarket: () => getJson('/polymarket/btc'),
+  backtest: (params = {}) => {
+    const q = new URLSearchParams(params)
+    const suffix = q.toString() ? `?${q}` : ''
+    return getJson(`/backtest${suffix}`)
+  },
   runNow: () => postJson('/predict/run'),
   settleNow: () => postJson('/predict/settle'),
 }

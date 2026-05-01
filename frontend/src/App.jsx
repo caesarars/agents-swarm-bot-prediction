@@ -7,6 +7,7 @@ import HistoryTable from './components/HistoryTable.jsx'
 import MarketPanel from './components/MarketPanel.jsx'
 import PolymarketPanel from './components/PolymarketPanel.jsx'
 import AgentVotesList from './components/AgentVotesList.jsx'
+import BacktestPanel from './components/BacktestPanel.jsx'
 
 export default function App() {
   const [latest, setLatest] = useState(null)
@@ -15,6 +16,9 @@ export default function App() {
   const [snapshotStatus, setSnapshotStatus] = useState('ok')
   const [polymarket, setPolymarket] = useState([])
   const [stats, setStats] = useState(null)
+  const [backtest, setBacktest] = useState(null)
+  const [backtestRunning, setBacktestRunning] = useState(false)
+  const [backtestErr, setBacktestErr] = useState(null)
   const [running, setRunning] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -48,10 +52,24 @@ export default function App() {
     }
   }, [])
 
+  const runBacktest = useCallback(async (params = {}) => {
+    setBacktestRunning(true)
+    setBacktestErr(null)
+    try {
+      const result = await api.backtest(params)
+      setBacktest(result)
+    } catch (e) {
+      setBacktestErr(String(e))
+    } finally {
+      setBacktestRunning(false)
+    }
+  }, [])
+
   useEffect(() => {
     refresh()
     refreshMarket()
     refreshPoly()
+    runBacktest()
     const i1 = setInterval(refresh, 5000)
     const i2 = setInterval(refreshMarket, 6000)
     const i3 = setInterval(refreshPoly, 30000)
@@ -60,7 +78,7 @@ export default function App() {
       clearInterval(i2)
       clearInterval(i3)
     }
-  }, [refresh, refreshMarket, refreshPoly])
+  }, [refresh, refreshMarket, refreshPoly, runBacktest])
 
   const runNow = async () => {
     setRunning(true)
@@ -140,6 +158,10 @@ export default function App() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <PolymarketPanel markets={polymarket} />
           <AgentVotesList predictionId={latest?.id} />
+        </section>
+
+        <section>
+          <BacktestPanel result={backtest} running={backtestRunning} error={backtestErr} onRun={runBacktest} />
         </section>
 
         <section>
