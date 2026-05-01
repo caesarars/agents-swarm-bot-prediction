@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     anthropic_base_url: str = "https://api.anthropic.com"
-    anthropic_model: str = "claude-3-5-haiku-20241022"
+    anthropic_model: str = "claude-haiku-4-5-20251001"
     anthropic_version: str = "2023-06-01"
 
     gemini_api_key: str = ""

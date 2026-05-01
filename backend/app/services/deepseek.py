@@ -74,8 +74,10 @@ def _user_prompt(snapshot_str: str) -> str:
     return (
         "Market snapshot (JSON):\n"
         f"{snapshot_str}\n\n"
-        "Respond with strict JSON: "
-        '{"prediction":"UP"|"DOWN","confidence":0-100,"reasoning":"..."}'
+        "Return exactly one valid JSON object and nothing else. "
+        "The first character must be { and the last character must be }. "
+        'Use this shape: {"prediction":"UP","confidence":51,"reasoning":"short reason"}. '
+        "prediction must be either UP or DOWN; confidence must be a number from 0 to 100."
     )
 
 
@@ -106,10 +108,17 @@ async def _post_with_retry(
         with attempt:
             r = await client.post(url, json=payload, headers=headers)
             if r.status_code in (429, 500, 502, 503, 504):
+                body = r.text[:500]
                 raise httpx.HTTPStatusError(
-                    f"retryable {r.status_code}", request=r.request, response=r
+                    f"retryable {r.status_code}: {body}", request=r.request, response=r
                 )
-            r.raise_for_status()
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                body = r.text[:500]
+                raise httpx.HTTPStatusError(
+                    f"{e}: {body}", request=r.request, response=r
+                ) from e
             return r.json()
     raise RuntimeError("unreachable retry state")
 
@@ -188,8 +197,18 @@ async def _call_gemini(client: httpx.AsyncClient, agent: Agent, snapshot_str: st
             ],
             "generationConfig": {
                 "temperature": 0.35,
-                "maxOutputTokens": 200,
+                "maxOutputTokens": 512,
+                "thinkingConfig": {"thinkingBudget": 0},
                 "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "prediction": {"type": "STRING", "enum": ["UP", "DOWN"]},
+                        "confidence": {"type": "NUMBER"},
+                        "reasoning": {"type": "STRING"},
+                    },
+                    "required": ["prediction", "confidence", "reasoning"],
+                },
             },
         },
     )

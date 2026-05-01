@@ -27,8 +27,9 @@ _BASE_RULES = (
     "or infer on-chain data, funding, open interest, liquidations, DXY, equities, news, "
     "options, max pain, or any external feed. If your assigned lens has no usable signal, "
     "pick the weaker side with confidence <= 52 instead of inventing facts. Respond with "
-    "STRICT JSON only, no prose, no markdown fences. Schema: "
-    '{"prediction":"UP"|"DOWN","confidence":0-100,"reasoning":"one sentence <= 240 chars"}'
+    "STRICT JSON only, no prose, no markdown fences. Use this valid JSON shape: "
+    '{"prediction":"UP","confidence":51,"reasoning":"one sentence <= 240 chars"}. '
+    "prediction must be either UP or DOWN."
 )
 
 
