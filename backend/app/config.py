@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
+    anthropic_api_key: str = ""
+    anthropic_base_url: str = "https://api.anthropic.com"
+    anthropic_model: str = "claude-3-5-haiku-20241022"
+    anthropic_version: str = "2023-06-01"
+
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com"
+    gemini_model: str = "gemini-2.5-flash"
+
     binance_api_key: str = ""
     binance_base_url: str = "https://api.binance.com"
 

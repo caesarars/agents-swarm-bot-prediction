@@ -1,4 +1,8 @@
-"""Async DeepSeek client with concurrency control and JSON-mode responses."""
+"""Async multi-provider LLM client for the prediction swarm.
+
+The module name is kept for compatibility with the rest of the app, but calls
+are routed per-agent to DeepSeek, Anthropic Claude, or Gemini.
+"""
 
 from __future__ import annotations
 
@@ -32,7 +36,6 @@ def _safe_parse(content: str) -> dict[str, Any] | None:
     if not content:
         return None
     text = content.strip()
-    # Strip ```json fences if present
     if text.startswith("```"):
         text = text.strip("`")
         if text.lower().startswith("json"):
@@ -41,7 +44,6 @@ def _safe_parse(content: str) -> dict[str, Any] | None:
     try:
         return json.loads(text)
     except Exception:
-        # try to find first { ... } block
         start = text.find("{")
         end = text.rfind("}")
         if start != -1 and end != -1 and end > start:
@@ -68,73 +70,177 @@ def _normalize(parsed: dict | None) -> tuple[str, float, str]:
     return pred, conf_f, reason
 
 
+def _user_prompt(snapshot_str: str) -> str:
+    return (
+        "Market snapshot (JSON):\n"
+        f"{snapshot_str}\n\n"
+        "Respond with strict JSON: "
+        '{"prediction":"UP"|"DOWN","confidence":0-100,"reasoning":"..."}'
+    )
+
+
+def _missing_key(agent: Agent, key_name: str) -> AgentResult:
+    return AgentResult(
+        agent_id=agent.id,
+        agent_name=agent.name,
+        agent_category=agent.category,
+        vote="ABSTAIN",
+        confidence=0.0,
+        reasoning="",
+        error=f"{key_name} is not configured",
+    )
+
+
+async def _post_with_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.6, max=4),
+        reraise=True,
+    ):
+        with attempt:
+            r = await client.post(url, json=payload, headers=headers)
+            if r.status_code in (429, 500, 502, 503, 504):
+                raise httpx.HTTPStatusError(
+                    f"retryable {r.status_code}", request=r.request, response=r
+                )
+            r.raise_for_status()
+            return r.json()
+    raise RuntimeError("unreachable retry state")
+
+
+async def _call_deepseek(client: httpx.AsyncClient, agent: Agent, snapshot_str: str) -> str | AgentResult:
+    settings = get_settings()
+    if not settings.deepseek_api_key:
+        return _missing_key(agent, "DEEPSEEK_API_KEY")
+
+    data = await _post_with_retry(
+        client,
+        f"{settings.deepseek_base_url}/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {settings.deepseek_api_key}",
+            "Content-Type": "application/json",
+        },
+        payload={
+            "model": settings.deepseek_model,
+            "messages": [
+                {"role": "system", "content": agent.system_prompt},
+                {"role": "user", "content": _user_prompt(snapshot_str)},
+            ],
+            "temperature": 0.35,
+            "max_tokens": 200,
+            "response_format": {"type": "json_object"},
+            "stream": False,
+        },
+    )
+    return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+
+async def _call_anthropic(client: httpx.AsyncClient, agent: Agent, snapshot_str: str) -> str | AgentResult:
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        return _missing_key(agent, "ANTHROPIC_API_KEY")
+
+    data = await _post_with_retry(
+        client,
+        f"{settings.anthropic_base_url}/v1/messages",
+        headers={
+            "x-api-key": settings.anthropic_api_key,
+            "anthropic-version": settings.anthropic_version,
+            "Content-Type": "application/json",
+        },
+        payload={
+            "model": settings.anthropic_model,
+            "system": agent.system_prompt,
+            "messages": [{"role": "user", "content": _user_prompt(snapshot_str)}],
+            "temperature": 0.35,
+            "max_tokens": 200,
+        },
+    )
+    blocks = data.get("content") or []
+    return "".join(str(b.get("text", "")) for b in blocks if isinstance(b, dict))
+
+
+async def _call_gemini(client: httpx.AsyncClient, agent: Agent, snapshot_str: str) -> str | AgentResult:
+    settings = get_settings()
+    if not settings.gemini_api_key:
+        return _missing_key(agent, "GEMINI_API_KEY")
+
+    data = await _post_with_retry(
+        client,
+        f"{settings.gemini_base_url}/v1beta/models/{settings.gemini_model}:generateContent",
+        headers={
+            "x-goog-api-key": settings.gemini_api_key,
+            "Content-Type": "application/json",
+        },
+        payload={
+            "systemInstruction": {"parts": [{"text": agent.system_prompt}]},
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": _user_prompt(snapshot_str)}],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.35,
+                "maxOutputTokens": 200,
+                "responseMimeType": "application/json",
+            },
+        },
+    )
+    parts = (
+        data.get("candidates", [{}])[0]
+        .get("content", {})
+        .get("parts", [])
+    )
+    return "".join(str(p.get("text", "")) for p in parts if isinstance(p, dict))
+
+
 async def _call_one(
     client: httpx.AsyncClient,
     semaphore: asyncio.Semaphore,
     agent: Agent,
     snapshot_str: str,
 ) -> AgentResult:
-    settings = get_settings()
-    headers = {
-        "Authorization": f"Bearer {settings.deepseek_api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": settings.deepseek_model,
-        "messages": [
-            {"role": "system", "content": agent.system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    "Market snapshot (JSON):\n"
-                    f"{snapshot_str}\n\n"
-                    "Respond with strict JSON: "
-                    '{"prediction":"UP"|"DOWN","confidence":0-100,"reasoning":"..."}'
-                ),
-            },
-        ],
-        "temperature": 0.7,
-        "max_tokens": 200,
-        "response_format": {"type": "json_object"},
-        "stream": False,
-    }
-
     async with semaphore:
         try:
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(3),
-                wait=wait_exponential(multiplier=0.6, max=4),
-                reraise=True,
-            ):
-                with attempt:
-                    r = await client.post(
-                        f"{settings.deepseek_base_url}/v1/chat/completions",
-                        json=payload,
-                        headers=headers,
-                    )
-                    if r.status_code in (429, 500, 502, 503, 504):
-                        raise httpx.HTTPStatusError(
-                            f"retryable {r.status_code}", request=r.request, response=r
-                        )
-                    r.raise_for_status()
-                    data = r.json()
-                    content = (
-                        data.get("choices", [{}])[0]
-                        .get("message", {})
-                        .get("content", "")
-                    )
-                    parsed = _safe_parse(content)
-                    vote, conf, reason = _normalize(parsed)
-                    return AgentResult(
-                        agent_id=agent.id,
-                        agent_name=agent.name,
-                        agent_category=agent.category,
-                        vote=vote,
-                        confidence=conf,
-                        reasoning=reason,
-                    )
+            if agent.provider == "deepseek":
+                content = await _call_deepseek(client, agent, snapshot_str)
+            elif agent.provider == "anthropic":
+                content = await _call_anthropic(client, agent, snapshot_str)
+            elif agent.provider == "gemini":
+                content = await _call_gemini(client, agent, snapshot_str)
+            else:
+                content = AgentResult(
+                    agent.id,
+                    agent.name,
+                    agent.category,
+                    "ABSTAIN",
+                    0.0,
+                    "",
+                    f"unsupported provider {agent.provider}",
+                )
+
+            if isinstance(content, AgentResult):
+                return content
+
+            parsed = _safe_parse(content)
+            vote, conf, reason = _normalize(parsed)
+            return AgentResult(
+                agent_id=agent.id,
+                agent_name=agent.name,
+                agent_category=agent.category,
+                vote=vote,
+                confidence=conf,
+                reasoning=reason,
+            )
         except (httpx.HTTPError, RetryError, asyncio.TimeoutError) as e:
-            log.warning("agent %s failed: %s", agent.id, e)
+            log.warning("agent %s (%s) failed: %s", agent.id, agent.provider, e)
             return AgentResult(
                 agent_id=agent.id,
                 agent_name=agent.name,
@@ -145,7 +251,7 @@ async def _call_one(
                 error=str(e)[:300],
             )
         except Exception as e:
-            log.exception("agent %s crashed", agent.id)
+            log.exception("agent %s (%s) crashed", agent.id, agent.provider)
             return AgentResult(
                 agent_id=agent.id,
                 agent_name=agent.name,
@@ -156,18 +262,15 @@ async def _call_one(
                 error=str(e)[:300],
             )
 
-    # Should not reach here
-    return AgentResult(agent.id, agent.name, agent.category, "ABSTAIN", 0.0, "", "no result")
-
 
 async def run_swarm(agents: list[Agent], snapshot: dict) -> list[AgentResult]:
     settings = get_settings()
-    if not settings.deepseek_api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
-
     snapshot_str = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
     timeout = httpx.Timeout(settings.agent_timeout_seconds, connect=10.0)
-    limits = httpx.Limits(max_connections=settings.agent_concurrency * 2, max_keepalive_connections=settings.agent_concurrency)
+    limits = httpx.Limits(
+        max_connections=settings.agent_concurrency * 2,
+        max_keepalive_connections=settings.agent_concurrency,
+    )
     semaphore = asyncio.Semaphore(settings.agent_concurrency)
 
     async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:

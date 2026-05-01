@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import desc, func, select
 
 from ..agents import get_all_agents
+from ..config import get_settings
 from ..database import AgentVote, Prediction, get_session_maker
 from ..services import backtest, market, polymarket, prediction
 
@@ -33,8 +34,15 @@ def _serialize_prediction(p: Prediction) -> dict[str, Any]:
 
 @router.get("/agents")
 async def list_agents() -> list[dict[str, Any]]:
+    settings = get_settings()
     return [
-        {"id": a.id, "name": a.name, "category": a.category}
+        {
+            "id": a.id,
+            "name": a.name,
+            "category": a.category,
+            "provider": a.provider,
+            "model": str(getattr(settings, a.model_setting, a.model_setting)),
+        }
         for a in get_all_agents()
     ]
 
