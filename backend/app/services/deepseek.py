@@ -26,6 +26,7 @@ class AgentResult:
     agent_id: int
     agent_name: str
     agent_category: str
+    provider: str
     vote: str  # UP / DOWN / ABSTAIN
     confidence: float
     reasoning: str
@@ -86,6 +87,7 @@ def _missing_key(agent: Agent, key_name: str) -> AgentResult:
         agent_id=agent.id,
         agent_name=agent.name,
         agent_category=agent.category,
+        provider=agent.provider,
         vote="ABSTAIN",
         confidence=0.0,
         reasoning="",
@@ -239,6 +241,7 @@ async def _call_one(
                     agent.id,
                     agent.name,
                     agent.category,
+                    agent.provider,
                     "ABSTAIN",
                     0.0,
                     "",
@@ -254,6 +257,7 @@ async def _call_one(
                 agent_id=agent.id,
                 agent_name=agent.name,
                 agent_category=agent.category,
+                provider=agent.provider,
                 vote=vote,
                 confidence=conf,
                 reasoning=reason,
@@ -264,6 +268,7 @@ async def _call_one(
                 agent_id=agent.id,
                 agent_name=agent.name,
                 agent_category=agent.category,
+                provider=agent.provider,
                 vote="ABSTAIN",
                 confidence=0.0,
                 reasoning="",
@@ -275,6 +280,7 @@ async def _call_one(
                 agent_id=agent.id,
                 agent_name=agent.name,
                 agent_category=agent.category,
+                provider=agent.provider,
                 vote="ABSTAIN",
                 confidence=0.0,
                 reasoning="",

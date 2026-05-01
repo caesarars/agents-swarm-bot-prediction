@@ -1,9 +1,7 @@
-"""Grounded multi-model agent roster.
+"""Grounded DeepSeek-only agent roster.
 
-The swarm intentionally uses fewer agents than before, but with lower correlated
-error: the same data-grounded specialists are run across DeepSeek, Claude Haiku,
-and Gemini Flash. Agents that require unavailable feeds (on-chain, macro,
-options, liquidations, funding/OI) are excluded until those feeds are added.
+Agents that require unavailable feeds (on-chain, macro, options, liquidations,
+funding/OI) are excluded until those feeds are added.
 """
 
 from dataclasses import dataclass
@@ -112,28 +110,18 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
 ]
 
 
-_PROVIDERS: list[tuple[str, str, str]] = [
-    ("deepseek", "DeepSeek", "deepseek_model"),
-    ("anthropic", "Claude Haiku", "anthropic_model"),
-    ("gemini", "Gemini Flash", "gemini_model"),
-]
-
-
 def _agent(
     id_: int,
-    provider: str,
-    provider_label: str,
-    model_setting_name: str,
     category: str,
     specialist: str,
     lens: str,
 ) -> Agent:
     return Agent(
         id=id_,
-        name=f"{provider_label} / {specialist}",
+        name=specialist,
         category=category,
-        provider=provider,
-        model_setting=model_setting_name,
+        provider="deepseek",
+        model_setting="deepseek_model",
         system_prompt=f"{_BASE_RULES}\n\nYour analytical lens: {lens}",
     )
 
@@ -141,26 +129,22 @@ def _agent(
 def _build_agents() -> list[Agent]:
     agents: list[Agent] = []
     next_id = 1
-    for provider, provider_label, model_setting_name in _PROVIDERS:
-        for category, specialist, lens in _SPECIALISTS:
-            agents.append(
-                _agent(
-                    next_id,
-                    provider,
-                    provider_label,
-                    model_setting_name,
-                    category,
-                    specialist,
-                    lens,
-                )
+    for category, specialist, lens in _SPECIALISTS:
+        agents.append(
+            _agent(
+                next_id,
+                category,
+                specialist,
+                lens,
             )
-            next_id += 1
+        )
+        next_id += 1
     return agents
 
 
 ALL_AGENTS: list[Agent] = _build_agents()
 
-assert len(ALL_AGENTS) == 45, f"Expected 45 agents, got {len(ALL_AGENTS)}"
+assert len(ALL_AGENTS) == 15, f"Expected 15 agents, got {len(ALL_AGENTS)}"
 assert len({a.id for a in ALL_AGENTS}) == len(ALL_AGENTS), "Agent IDs must be unique"
 
 

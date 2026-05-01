@@ -8,7 +8,7 @@ from sqlalchemy import desc, func, select
 from ..agents import get_all_agents
 from ..config import get_settings
 from ..database import AgentVote, Prediction, get_session_maker
-from ..services import backtest, market, polymarket, prediction
+from ..services import backtest, learning, market, polymarket, prediction
 
 router = APIRouter()
 
@@ -128,6 +128,13 @@ async def stats() -> dict[str, Any]:
             "correct_predictions": correct,
             "accuracy": accuracy,
         }
+
+
+@router.get("/learning/performance")
+async def learning_performance() -> dict[str, Any]:
+    session_maker = get_session_maker()
+    async with session_maker() as session:
+        return await learning.build_learning_profile(session)
 
 
 @router.get("/backtest")

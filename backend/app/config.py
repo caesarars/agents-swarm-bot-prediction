@@ -31,6 +31,20 @@ class Settings(BaseSettings):
     prediction_interval_minutes: int = 5
     agent_concurrency: int = 10
     agent_timeout_seconds: int = 45
+    swarm_aggregation_mode: str = "weighted"
+    swarm_primary_provider: str = "deepseek"
+    swarm_primary_min_margin: float = 1.5
+    swarm_override_margin: float = 4.0
+    swarm_deepseek_weight: float = 1.0
+    swarm_anthropic_weight: float = 0.0
+    swarm_gemini_weight: float = 0.0
+    learning_enabled: bool = True
+    learning_lookback: int = 200
+    learning_min_agent_samples: int = 8
+    learning_min_group_samples: int = 12
+    learning_min_weight: float = 0.35
+    learning_max_weight: float = 1.8
+    learning_smoothing: float = 6.0
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

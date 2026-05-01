@@ -21,17 +21,8 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     configure_logging()
     settings = get_settings()
-    missing = [
-        name
-        for name, value in (
-            ("DEEPSEEK_API_KEY", settings.deepseek_api_key),
-            ("ANTHROPIC_API_KEY", settings.anthropic_api_key),
-            ("GEMINI_API_KEY", settings.gemini_api_key),
-        )
-        if not value
-    ]
-    if missing:
-        log.warning("missing LLM keys: %s (matching agents will abstain)", ", ".join(missing))
+    if not settings.deepseek_api_key:
+        log.warning("DEEPSEEK_API_KEY missing — DeepSeek agents will abstain")
     await init_db()
     sched = scheduler.start_scheduler()
     log.info("app ready (jobs=%s)", [j.id for j in sched.get_jobs()])
@@ -45,7 +36,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title="BTC 5-Min Swarm Predictor",
-        description="Multi-model AI agents predicting BTC up/down for the next 5 minutes.",
+        description="DeepSeek-powered grounded AI agents predicting BTC up/down for the next 5 minutes.",
         version="1.0.0",
         lifespan=lifespan,
     )
