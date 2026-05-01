@@ -110,7 +110,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">BTC 5-Min Swarm Predictor</h1>
-            <p className="text-xs text-slate-400">45 grounded agents across DeepSeek, Claude Haiku, and Gemini Flash.</p>
+            <p className="text-xs text-slate-400">50 grounded DeepSeek agents using only data present in the snapshot.</p>
           </div>
           <div className="flex items-center gap-3">
             <Countdown targetAt={latest?.target_at} />

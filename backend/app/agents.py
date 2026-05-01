@@ -48,6 +48,41 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
         "Use Bollinger bands, bandwidth, ATR, and distance from recent highs/lows. Band extremes favor short mean reversion unless candles show breakout confirmation.",
     ),
     (
+        "Technical Analysis",
+        "EMA Spread Strength",
+        "Measure how far ema9 is from ema21 relative to atr14. A widening positive spread favors UP; widening negative spread favors DOWN; tiny spread means low confidence.",
+    ),
+    (
+        "Technical Analysis",
+        "VWAP Distance",
+        "Compare price to vwap and atr14. Small distance with trend alignment favors continuation; far above vwap favors DOWN reversion; far below favors UP reversion.",
+    ),
+    (
+        "Technical Analysis",
+        "SMA20 Slope",
+        "Use sma20 and recent closes to infer slope. Price above rising sma20 favors UP; below falling sma20 favors DOWN; flat slope lowers confidence.",
+    ),
+    (
+        "Technical Analysis",
+        "Bollinger Bandwidth Regime",
+        "Use bollinger bandwidth. Low bandwidth means breakout risk; choose direction from last close sequence. High bandwidth means prefer reversion from band extremes.",
+    ),
+    (
+        "Technical Analysis",
+        "ATR Breakout Filter",
+        "Use atr14 and latest candle range. A close beyond recent range with range above ATR favors continuation; otherwise fade weak breakouts.",
+    ),
+    (
+        "Technical Analysis",
+        "Indicator Confluence Counter",
+        "Count agreement among rsi14, macd histogram, ema9/ema21, vwap, and sma20. Predict the side with the most grounded confluence.",
+    ),
+    (
+        "Technical Analysis",
+        "Short Trend Exhaustion",
+        "If indicators all point one way but RSI is stretched and price is near band extreme, expect 5-minute exhaustion against the crowded direction.",
+    ),
+    (
         "Price Action",
         "Candle Body Reader",
         "Read the last 5 one-minute candles. Consecutive strong closes favor continuation; long exhaustion bodies after a fast move reduce confidence.",
@@ -61,6 +96,41 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
         "Price Action",
         "Range Breakout",
         "Use window_high_20/window_low_20 and last closes. Break and hold above range favors UP; break below favors DOWN; inside range favors lower confidence.",
+    ),
+    (
+        "Price Action",
+        "Last Candle Close Location",
+        "Compare the latest close to its high-low range. Close near high favors UP; close near low favors DOWN; close near middle is neutral.",
+    ),
+    (
+        "Price Action",
+        "Three-Candle Run",
+        "Inspect the last three candle bodies. Three aligned bodies favor continuation unless the third body is much larger than prior candles, which suggests exhaustion.",
+    ),
+    (
+        "Price Action",
+        "Inside Range Compression",
+        "If recent candles are nested inside prior ranges, expect breakout in the direction of the preceding micro-trend; keep confidence modest.",
+    ),
+    (
+        "Price Action",
+        "Support Bounce",
+        "Use window_low_20 and lower wicks. Repeated rejection near recent lows favors UP; clean close through recent lows favors DOWN.",
+    ),
+    (
+        "Price Action",
+        "Resistance Rejection",
+        "Use window_high_20 and upper wicks. Repeated rejection near recent highs favors DOWN; clean close through recent highs favors UP.",
+    ),
+    (
+        "Price Action",
+        "Micro Pullback",
+        "In an obvious short trend, a small counter candle after momentum usually favors trend resumption; large counter candle favors reversal.",
+    ),
+    (
+        "Price Action",
+        "Candle Volume Confirmation",
+        "Use recent candle volume. Directional candles with rising volume are more credible; directional candles on fading volume are less credible.",
     ),
     (
         "Order Book",
@@ -78,6 +148,41 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
         "Use depth imbalance with latest candle direction. If price moves hard into opposing liquidity, favor a short fade; if liquidity supports the move, continue.",
     ),
     (
+        "Order Book",
+        "Top-10 Depth Pressure",
+        "Compare top10_bid_qty and top10_ask_qty. Persistent bid pressure favors UP; persistent ask pressure favors DOWN; small difference means neutral.",
+    ),
+    (
+        "Order Book",
+        "Book vs Candle Divergence",
+        "If candles rise while order book imbalance leans ask-heavy, suspect fade DOWN. If candles fall while bid-heavy, suspect bounce UP.",
+    ),
+    (
+        "Order Book",
+        "Spread Risk Guard",
+        "If spread_bps is elevated, lower confidence and avoid strong continuation calls. If spread is tight, trust depth imbalance more.",
+    ),
+    (
+        "Order Book",
+        "Best Bid Ask Skew",
+        "Use best_bid/best_ask and bid_qty/ask_qty. Larger size at best bid favors UP; larger size at best ask favors DOWN.",
+    ),
+    (
+        "Order Book",
+        "Liquidity Cushion",
+        "If bid depth is large below price, downside is cushioned and UP is favored. If ask depth is large above price, upside is capped and DOWN is favored.",
+    ),
+    (
+        "Order Book",
+        "Thin Book Continuation",
+        "When both sides have low top10 depth, price can continue the latest candle direction easily; lower confidence because slippage risk is high.",
+    ),
+    (
+        "Order Book",
+        "Depth Neutral Arbiter",
+        "If book imbalance is near zero, ignore order book and choose direction from price action with low-to-medium confidence.",
+    ),
+    (
         "Statistics",
         "Return Distribution",
         "Estimate the mean and skew of recent one-minute returns from candles_1m. Positive recent return distribution favors UP; negative favors DOWN.",
@@ -93,6 +198,41 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
         "Compare direction persistence in recent candle closes. Alternating candles favor reversion; runs of 2-3 favor continuation; long runs favor exhaustion.",
     ),
     (
+        "Statistics",
+        "Mean Reversion Z-Score",
+        "Estimate price z-score against recent closes. Large positive deviation favors DOWN; large negative deviation favors UP; near mean follows weak trend.",
+    ),
+    (
+        "Statistics",
+        "Recent Hit-Rate Policy",
+        "Imagine following the previous candle for the recent window. If that policy would have worked, follow last candle; otherwise oppose it.",
+    ),
+    (
+        "Statistics",
+        "Range Percentile",
+        "Compare latest price to the recent high-low percentile. Near top favors DOWN unless breakout is strong; near bottom favors UP unless breakdown is strong.",
+    ),
+    (
+        "Statistics",
+        "Volume-Weighted Drift",
+        "Weight recent candle returns by volume. Positive volume-weighted drift favors UP; negative volume-weighted drift favors DOWN.",
+    ),
+    (
+        "Statistics",
+        "Volatility Compression",
+        "If recent ranges are compressed, expect a directional move using last micro-trend. If ranges are expanded, expect reversion unless breakout holds.",
+    ),
+    (
+        "Statistics",
+        "Five-Minute Proxy",
+        "Use the last 5 one-minute closes as a proxy for the target horizon. Positive slope favors UP; negative slope favors DOWN.",
+    ),
+    (
+        "Statistics",
+        "Robust Median Return",
+        "Use median rather than mean of recent returns to reduce outlier influence. Positive median favors UP; negative median favors DOWN.",
+    ),
+    (
         "Sentiment",
         "Fear & Greed Filter",
         "Use only sentiment.fear_and_greed if present. Extreme greed slightly favors DOWN contrarian; extreme fear slightly favors UP; mid-range should not override price.",
@@ -106,6 +246,41 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
         "Sentiment",
         "Low-Weight Sentiment Skeptic",
         "Treat sentiment as slow and weak for a 5-minute horizon. Use it only as a tie-breaker after candles, indicators, and order book evidence.",
+    ),
+    (
+        "Sentiment",
+        "Extreme Greed Contrarian",
+        "If Fear & Greed is extreme greed, reduce bullish confidence and prefer DOWN only when technicals are also stretched.",
+    ),
+    (
+        "Sentiment",
+        "Extreme Fear Contrarian",
+        "If Fear & Greed is extreme fear, reduce bearish confidence and prefer UP only when price action shows stabilization.",
+    ),
+    (
+        "Sentiment",
+        "Neutral Sentiment Ignorer",
+        "If Fear & Greed is neutral or missing, ignore sentiment entirely and base prediction on technical and order book evidence.",
+    ),
+    (
+        "Sentiment",
+        "Sentiment Confidence Dampener",
+        "When sentiment conflicts with fast price action, keep the price-action direction but lower confidence because sentiment is slow for 5-minute horizons.",
+    ),
+    (
+        "Sentiment",
+        "Risk Appetite Overlay",
+        "Use Fear & Greed only as a broad risk appetite overlay. Greed supports trend continuation when not extreme; fear supports caution when not extreme.",
+    ),
+    (
+        "Sentiment",
+        "Contrarian Tie Breaker",
+        "When technical, price action, and order book signals are balanced, use Fear & Greed contrarian logic as the tie breaker.",
+    ),
+    (
+        "Sentiment",
+        "Sentiment Minimalist",
+        "Give sentiment the smallest weight. Only let it affect the call when all market snapshot signals are weak or contradictory.",
     ),
 ]
 
@@ -144,7 +319,7 @@ def _build_agents() -> list[Agent]:
 
 ALL_AGENTS: list[Agent] = _build_agents()
 
-assert len(ALL_AGENTS) == 15, f"Expected 15 agents, got {len(ALL_AGENTS)}"
+assert len(ALL_AGENTS) == 50, f"Expected 50 agents, got {len(ALL_AGENTS)}"
 assert len({a.id for a in ALL_AGENTS}) == len(ALL_AGENTS), "Agent IDs must be unique"
 
 
