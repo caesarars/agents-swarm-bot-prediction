@@ -8,6 +8,7 @@ import MarketPanel from './components/MarketPanel.jsx'
 import PolymarketPanel from './components/PolymarketPanel.jsx'
 import AgentVotesList from './components/AgentVotesList.jsx'
 import BacktestPanel from './components/BacktestPanel.jsx'
+import LearningPerformancePanel from './components/LearningPerformancePanel.jsx'
 
 export default function App() {
   const [latest, setLatest] = useState(null)
@@ -19,6 +20,8 @@ export default function App() {
   const [backtest, setBacktest] = useState(null)
   const [backtestRunning, setBacktestRunning] = useState(false)
   const [backtestErr, setBacktestErr] = useState(null)
+  const [learning, setLearning] = useState(null)
+  const [agents, setAgents] = useState([])
   const [running, setRunning] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -65,20 +68,34 @@ export default function App() {
     }
   }, [])
 
+  const refreshLearning = useCallback(async () => {
+    try {
+      const [profile, agentList] = await Promise.all([api.learning(), api.agents()])
+      setLearning(profile)
+      setAgents(agentList)
+    } catch {
+      setLearning(null)
+      setAgents([])
+    }
+  }, [])
+
   useEffect(() => {
     refresh()
     refreshMarket()
     refreshPoly()
+    refreshLearning()
     runBacktest()
     const i1 = setInterval(refresh, 5000)
     const i2 = setInterval(refreshMarket, 6000)
     const i3 = setInterval(refreshPoly, 30000)
+    const i4 = setInterval(refreshLearning, 30000)
     return () => {
       clearInterval(i1)
       clearInterval(i2)
       clearInterval(i3)
+      clearInterval(i4)
     }
-  }, [refresh, refreshMarket, refreshPoly, runBacktest])
+  }, [refresh, refreshMarket, refreshPoly, refreshLearning, runBacktest])
 
   const runNow = async () => {
     setRunning(true)
@@ -115,7 +132,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">BTC 5-Min Swarm Predictor</h1>
-            <p className="text-xs text-slate-400">50 DeepSeek primary agents plus 20 Haiku validators.</p>
+            <p className="text-xs text-slate-400">60 DeepSeek primary agents plus 20 Haiku validators.</p>
           </div>
           <div className="flex items-center gap-3">
             <Countdown targetAt={countdownTarget} label={countdownLabel} />
@@ -167,6 +184,10 @@ export default function App() {
 
         <section>
           <BacktestPanel result={backtest} running={backtestRunning} error={backtestErr} onRun={runBacktest} />
+        </section>
+
+        <section>
+          <LearningPerformancePanel profile={learning} agents={agents} />
         </section>
 
         <section>

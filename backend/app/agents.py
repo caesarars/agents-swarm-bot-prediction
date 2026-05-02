@@ -20,9 +20,9 @@ class Agent:
 _BASE_RULES = (
     "You are predicting whether BTC/USDT will close UP or DOWN 5 minutes from now "
     "relative to the current snapshot price. You will receive JSON containing only "
-    "Binance spot candles, top-of-book/depth summary, technical indicators, and "
+    "Binance spot candles, top-of-book/depth summary, technical indicators, Binance Futures public data, and "
     "Fear & Greed sentiment. Use ONLY fields present in the snapshot. Do not mention "
-    "or infer on-chain data, funding, open interest, liquidations, DXY, equities, news, "
+    "or infer on-chain data, liquidations, DXY, equities, news, "
     "options, max pain, or any external feed. If your assigned lens has no usable signal, "
     "pick the weaker side with confidence <= 52 instead of inventing facts. Respond with "
     "STRICT JSON only, no prose, no markdown fences. Use this valid JSON shape: "
@@ -183,6 +183,56 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
         "If book imbalance is near zero, ignore order book and choose direction from price action with low-to-medium confidence.",
     ),
     (
+        "Futures",
+        "Funding Rate Contrarian",
+        "Use futures.last_funding_rate. Strong positive funding means crowded longs and favors DOWN if spot is stretched; negative funding favors UP if spot is stabilizing.",
+    ),
+    (
+        "Futures",
+        "Premium Index Momentum",
+        "Use futures.premium_bps and mark/index price. Positive premium expanding with spot momentum favors UP; premium collapsing favors DOWN.",
+    ),
+    (
+        "Futures",
+        "Open Interest Pressure",
+        "Use futures.open_interest as context with recent candle direction. Rising OI with price up favors UP continuation; rising OI with price down favors DOWN continuation.",
+    ),
+    (
+        "Futures",
+        "Mark vs Index Skew",
+        "Compare mark_price and index_price. Mark above index with weak spot candles warns of long crowding; mark below index with firm spot warns of short crowding.",
+    ),
+    (
+        "Futures",
+        "Funding History Slope",
+        "Use recent_funding_rates. Funding becoming more positive can signal overheated longs; funding becoming less positive or negative can support UP.",
+    ),
+    (
+        "Futures",
+        "Perp Spot Agreement",
+        "When futures premium and spot technical trend agree, raise confidence in continuation. When they disagree, lower confidence or favor mean reversion.",
+    ),
+    (
+        "Futures",
+        "Next Funding Proximity",
+        "Use next_funding_time. If funding is extreme near the funding timestamp, expect positioning effects; otherwise keep futures weight modest.",
+    ),
+    (
+        "Futures",
+        "Crowding Reversal",
+        "Look for high funding plus stretched RSI/Bollinger as crowded long risk favoring DOWN, or negative funding plus oversold spot as crowded short risk favoring UP.",
+    ),
+    (
+        "Futures",
+        "Futures Confidence Gate",
+        "If futures.available is false, ignore futures. If available, use futures only when premium, funding, and spot trend point to the same side.",
+    ),
+    (
+        "Futures",
+        "Derivative Tie Breaker",
+        "Use futures data only as a tie breaker when technical, price action, and order book votes are balanced. Avoid overriding clear spot evidence.",
+    ),
+    (
         "Statistics",
         "Return Distribution",
         "Estimate the mean and skew of recent one-minute returns from candles_1m. Positive recent return distribution favors UP; negative favors DOWN.",
@@ -335,7 +385,7 @@ def _build_agents() -> list[Agent]:
 
 ALL_AGENTS: list[Agent] = _build_agents()
 
-assert len(ALL_AGENTS) == 70, f"Expected 70 agents, got {len(ALL_AGENTS)}"
+assert len(ALL_AGENTS) == 80, f"Expected 80 agents, got {len(ALL_AGENTS)}"
 assert len({a.id for a in ALL_AGENTS}) == len(ALL_AGENTS), "Agent IDs must be unique"
 
 

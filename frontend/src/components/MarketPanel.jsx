@@ -27,6 +27,7 @@ export default function MarketPanel({ snapshot, status }) {
   const macd = ind.macd || {}
   const boll = ind.bollinger || {}
   const fng = snapshot.sentiment?.fear_and_greed
+  const futures = snapshot.futures || {}
   return (
     <div className="rounded-xl bg-card p-6 border border-slate-800">
       <div className="flex items-center justify-between mb-2">
@@ -53,6 +54,9 @@ export default function MarketPanel({ snapshot, status }) {
         {row('Boll BW', fmt(boll.bandwidth, 4))}
         {row('ATR(14)', fmt(ind.atr14, 2))}
         {row('VWAP', fmt(ind.vwap, 2))}
+        {row('Futures premium', futures.available ? `${fmt(futures.premium_bps, 2)} bps` : '-')}
+        {row('Funding', futures.available && futures.last_funding_rate != null ? `${fmt(futures.last_funding_rate * 100, 4)}%` : '-')}
+        {row('Open interest', futures.available && futures.open_interest != null ? Number(futures.open_interest).toLocaleString() : '-')}
         {row(
           'Spread',
           snapshot.depth_summary?.spread_bps ? `${fmt(snapshot.depth_summary.spread_bps, 2)} bps` : '-',

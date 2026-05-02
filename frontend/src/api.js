@@ -18,6 +18,7 @@ export const api = {
   votes: (id) => getJson(`/predictions/${id}/votes`),
   agents: () => getJson('/agents'),
   stats: () => getJson('/stats'),
+  learning: () => getJson('/learning/performance'),
   snapshot: () => getJson('/market/snapshot'),
   polymarket: () => getJson('/polymarket/btc'),
   backtest: (params = {}) => {

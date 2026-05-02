@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     binance_api_key: str = ""
     binance_base_url: str = "https://api.binance.com"
+    binance_futures_base_url: str = "https://fapi.binance.com"
 
     polymarket_api_key: str = ""
     polymarket_gamma_url: str = "https://gamma-api.polymarket.com"

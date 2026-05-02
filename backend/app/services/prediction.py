@@ -157,6 +157,7 @@ async def run_prediction_round() -> int:
                 "indicators": snapshot["indicators"],
                 "depth_summary": snapshot["depth_summary"],
                 "sentiment": snapshot["sentiment"],
+                "futures": snapshot.get("futures"),
                 "aggregation": {
                     "mode": settings.swarm_aggregation_mode,
                     "primary_provider": settings.swarm_primary_provider,
