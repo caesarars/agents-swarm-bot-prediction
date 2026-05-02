@@ -1,14 +1,13 @@
 """Polymarket public Gamma API client.
 
-Pulls active markets that look like a 5-minute (or short-term) BTC up/down bet.
+Pulls active BTC up/down style markets, preferring those that resolve in the next
+1 hour to ~3 days (matching the 1-hour swarm horizon).
 The Gamma API is public; the API key is included as Bearer for higher rate limits if provided.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -35,14 +34,21 @@ def _as_list(data: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _is_btc_updown_market(market: dict[str, Any]) -> bool:
+def _is_btc_market(market: dict[str, Any]) -> bool:
     slug = (market.get("slug") or market.get("ticker") or "").lower()
     question = (market.get("question") or market.get("title") or "").lower()
-    return slug.startswith("btc-updown-5m") or (
-        ("bitcoin" in question or "btc" in question)
-        and "up" in question
-        and "down" in question
-    )
+    if "bitcoin" in slug or "btc" in slug or "bitcoin" in question or "btc" in question:
+        return True
+    return False
+
+
+def _is_directional_market(market: dict[str, Any]) -> bool:
+    """True if the market is a BTC up/down or price-target market (binary direction)."""
+    text = ((market.get("question") or "") + " " + (market.get("slug") or "")).lower()
+    if not _is_btc_market(market):
+        return False
+    keywords = ("up or down", "updown", "above", "below", "reach", "hit", ">", "<", "close above", "close below")
+    return any(k in text for k in keywords)
 
 
 def _normalize_market(market: dict[str, Any], event_slug: str | None = None) -> dict[str, Any]:
@@ -60,22 +66,34 @@ def _normalize_market(market: dict[str, Any], event_slug: str | None = None) -> 
     }
 
 
-def _btc_updown_candidate_slugs(window_count: int = 18) -> list[str]:
-    """Polymarket 5m BTC events use btc-updown-5m-{window_start_epoch_seconds}."""
-    now = int(time.time())
-    current_window = now - (now % 300)
-    offsets = range(-1, max(-1, window_count - 1))
-    return [f"btc-updown-5m-{current_window + offset * 300}" for offset in offsets]
-
-
-def _is_recent_or_future(end_date: Any) -> bool:
-    if not end_date:
-        return False
+def _parse_end_date(value: Any) -> datetime | None:
+    if not value:
+        return None
     try:
-        parsed = datetime.fromisoformat(str(end_date).replace("Z", "+00:00"))
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
+        return None
+
+
+def _is_in_target_window(end_date: Any) -> bool:
+    """Match markets that resolve from now up to ~3 days out (1h horizon-friendly)."""
+    parsed = _parse_end_date(end_date)
+    if parsed is None:
         return False
-    return parsed >= datetime.now(timezone.utc) - timedelta(minutes=15)
+    now = datetime.now(timezone.utc)
+    return now - timedelta(minutes=5) <= parsed <= now + timedelta(days=3)
+
+
+def _horizon_score(market: dict[str, Any]) -> float:
+    """Lower is better. Prefers markets ending closest to ~1 hour ahead."""
+    parsed = _parse_end_date(market.get("end_date"))
+    if parsed is None:
+        return 1e9
+    delta_minutes = (parsed - datetime.now(timezone.utc)).total_seconds() / 60.0
+    target = 60.0  # minutes
+    if delta_minutes < 0:
+        return 1e6 + abs(delta_minutes)
+    return abs(delta_minutes - target)
 
 
 async def _fetch_json(client: httpx.AsyncClient, path: str, params: dict[str, Any]) -> Any:
@@ -85,44 +103,16 @@ async def _fetch_json(client: httpx.AsyncClient, path: str, params: dict[str, An
     return r.json()
 
 
-async def _fetch_markets_by_slug(client: httpx.AsyncClient, slug: str) -> list[dict[str, Any]]:
-    markets = _as_list(await _fetch_json(client, "/markets", {"slug": slug}))
-    out = [_normalize_market(m, event_slug=slug) for m in markets if _is_btc_updown_market(m)]
-    if out:
-        return out
-
-    events = _as_list(await _fetch_json(client, "/events", {"slug": slug}))
-    out = []
-    for event in events:
-        event_slug = event.get("slug") or slug
-        for market in event.get("markets") or []:
-            if isinstance(market, dict) and _is_btc_updown_market(market):
-                out.append(_normalize_market(market, event_slug=event_slug))
-    return out
-
-
 async def search_btc_short_term_markets(limit: int = 8) -> list[dict[str, Any]]:
-    """Try to surface active BTC up/down style markets."""
+    """Surface active BTC up/down style markets, ordered by closeness to a 1h horizon."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            slug_results = await asyncio.gather(
-                *[_fetch_markets_by_slug(client, slug) for slug in _btc_updown_candidate_slugs(limit + 8)],
-                return_exceptions=True,
-            )
-
-            candidate_markets: list[dict[str, Any]] = []
-            for result in slug_results:
-                if isinstance(result, Exception):
-                    log.debug("polymarket slug fetch failed: %s", result)
-                    continue
-                candidate_markets.extend(result)
-
             broad = _as_list(
                 await _fetch_json(
                     client,
                     "/markets",
                     {
-                        "limit": 100,
+                        "limit": 200,
                         "active": "true",
                         "closed": "false",
                         "order": "endDate",
@@ -130,19 +120,35 @@ async def search_btc_short_term_markets(limit: int = 8) -> list[dict[str, Any]]:
                     },
                 )
             )
-            broad_markets = [
-                _normalize_market(m)
-                for m in broad
-                if _is_btc_updown_market(m) and _is_recent_or_future(m.get("endDate") or m.get("endDateIso"))
-            ]
 
-            deduped: dict[str, dict[str, Any]] = {}
-            for market in candidate_markets + broad_markets:
-                key = str(market.get("id") or market.get("slug"))
-                if key and key not in deduped:
-                    deduped[key] = market
+            candidates: list[dict[str, Any]] = []
+            for raw in broad:
+                if not _is_btc_market(raw):
+                    continue
+                if not _is_in_target_window(raw.get("endDate") or raw.get("endDateIso")):
+                    continue
+                candidates.append(_normalize_market(raw))
 
-            return list(deduped.values())[:limit]
+            directional = [c for c in candidates if _is_directional_market(c) or _is_directional_market_normalized(c)]
+            picks = directional or candidates
+
+            picks.sort(key=_horizon_score)
+            seen: set[str] = set()
+            deduped: list[dict[str, Any]] = []
+            for m in picks:
+                key = str(m.get("id") or m.get("slug"))
+                if key and key not in seen:
+                    seen.add(key)
+                    deduped.append(m)
+
+            return deduped[:limit]
     except Exception as e:
         log.warning("polymarket fetch failed: %s", e)
         return []
+
+
+def _is_directional_market_normalized(market: dict[str, Any]) -> bool:
+    """Same intent as _is_directional_market but for already-normalized markets."""
+    text = ((market.get("question") or "") + " " + (market.get("slug") or "")).lower()
+    keywords = ("up or down", "updown", "above", "below", "reach", "hit", ">", "<", "close above", "close below")
+    return any(k in text for k in keywords)

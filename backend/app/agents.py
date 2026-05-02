@@ -18,15 +18,18 @@ class Agent:
 
 
 _BASE_RULES = (
-    "You are predicting whether BTC/USDT will close UP or DOWN 5 minutes from now "
-    "relative to the current snapshot price. You will receive JSON containing only "
-    "Binance spot candles, top-of-book/depth summary, technical indicators, Binance Futures public data, and "
-    "Fear & Greed sentiment. Use ONLY fields present in the snapshot. Do not mention "
-    "or infer on-chain data, liquidations, DXY, equities, news, "
-    "options, max pain, or any external feed. If your assigned lens has no usable signal, "
-    "pick the weaker side with confidence <= 52 instead of inventing facts. Respond with "
-    "STRICT JSON only, no prose, no markdown fences. Use this valid JSON shape: "
-    '{"prediction":"UP","confidence":51,"reasoning":"one sentence <= 240 chars"}. '
+    "You are predicting whether BTC/USDT will close UP or DOWN 1 hour from now "
+    "relative to the current snapshot price. You will receive JSON with these "
+    "fields: price, pct_change_1h, pct_change_15m, pct_change_24h, candles_1h "
+    "(last 30 hourly candles), candles_15m (last 16 fifteen-minute candles), "
+    "indicators computed on 1h closes (rsi14, ema9, ema21, sma20, macd, bollinger, "
+    "atr14, vwap, window_high_20, window_low_20), top-of-book/depth summary, "
+    "Binance Futures data, and Fear & Greed sentiment. Use ONLY fields present "
+    "in the snapshot. Do not mention or infer on-chain data, liquidations, DXY, "
+    "equities, news, options, or any external feed. If your assigned lens has no "
+    "usable signal, pick the weaker side with confidence <= 52 instead of inventing "
+    "facts. Respond with STRICT JSON only, no prose, no markdown fences. Use this "
+    'valid JSON shape: {"prediction":"UP","confidence":51,"reasoning":"one sentence <= 240 chars"}. '
     "prediction must be either UP or DOWN."
 )
 
@@ -35,7 +38,7 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
     (
         "Technical Analysis",
         "RSI/MACD Momentum",
-        "Use rsi14, macd histogram, pct_change_1m, and recent candle closes. Momentum confluence favors continuation; stretched RSI extremes reduce confidence or favor reversion.",
+        "Use rsi14, macd histogram, pct_change_1h, pct_change_15m, and recent candle closes. Momentum confluence favors continuation; stretched RSI extremes reduce confidence or favor reversion.",
     ),
     (
         "Technical Analysis",
@@ -80,12 +83,12 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
     (
         "Technical Analysis",
         "Short Trend Exhaustion",
-        "If indicators all point one way but RSI is stretched and price is near band extreme, expect 5-minute exhaustion against the crowded direction.",
+        "If indicators all point one way but RSI is stretched and price is near band extreme, expect 1-hour exhaustion against the crowded direction.",
     ),
     (
         "Price Action",
         "Candle Body Reader",
-        "Read the last 5 one-minute candles. Consecutive strong closes favor continuation; long exhaustion bodies after a fast move reduce confidence.",
+        "Read the last 5 hourly candles. Consecutive strong closes favor continuation; long exhaustion bodies after a fast move reduce confidence.",
     ),
     (
         "Price Action",
@@ -235,7 +238,7 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
     (
         "Statistics",
         "Return Distribution",
-        "Estimate the mean and skew of recent one-minute returns from candles_1m. Positive recent return distribution favors UP; negative favors DOWN.",
+        "Estimate the mean and skew of recent hourly returns from candles_1h. Positive recent return distribution favors UP; negative favors DOWN.",
     ),
     (
         "Statistics",
@@ -274,8 +277,8 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
     ),
     (
         "Statistics",
-        "Five-Minute Proxy",
-        "Use the last 5 one-minute closes as a proxy for the target horizon. Positive slope favors UP; negative slope favors DOWN.",
+        "Hour Proxy Slope",
+        "Use the last 4 candles_15m closes as a fine-grained proxy for the next hour. Positive slope favors UP; negative slope favors DOWN.",
     ),
     (
         "Statistics",
@@ -295,7 +298,7 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
     (
         "Sentiment",
         "Low-Weight Sentiment Skeptic",
-        "Treat sentiment as slow and weak for a 5-minute horizon. Use it only as a tie-breaker after candles, indicators, and order book evidence.",
+        "Sentiment is slow but at a 1-hour horizon it carries some weight. Use it as a moderate-weight tie-breaker after candles, indicators, and order book evidence.",
     ),
     (
         "Sentiment",
@@ -315,7 +318,7 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
     (
         "Sentiment",
         "Sentiment Confidence Dampener",
-        "When sentiment conflicts with fast price action, keep the price-action direction but lower confidence because sentiment is slow for 5-minute horizons.",
+        "When sentiment conflicts with hourly price action, keep the price-action direction but lower confidence; do not let sentiment fully override technicals.",
     ),
     (
         "Sentiment",

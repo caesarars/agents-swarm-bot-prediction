@@ -141,14 +141,16 @@ async def learning_performance() -> dict[str, Any]:
 @router.get("/backtest")
 async def backtest_harness(
     symbol: str = Query("BTCUSDT", min_length=3, max_length=20),
+    interval: str = Query("1h", min_length=2, max_length=4),
     lookback: int = Query(240, ge=20, le=900),
-    horizon_minutes: int = Query(5, ge=1, le=30),
+    horizon_minutes: int = Query(60, ge=1, le=1440),
     threshold_bps: float = Query(0.0, ge=0.0, le=100.0),
     fee_bps: float = Query(0.0, ge=0.0, le=100.0),
 ) -> dict[str, Any]:
     try:
         return await backtest.run_backtest(
             symbol=symbol,
+            interval=interval,
             lookback=lookback,
             horizon_minutes=horizon_minutes,
             threshold_bps=threshold_bps,

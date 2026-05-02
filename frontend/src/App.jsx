@@ -124,15 +124,15 @@ export default function App() {
     .filter((m) => m?.end_date && new Date(m.end_date).getTime() > Date.now() - 15000)
     .sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime())[0]
   const countdownTarget = polymarketTarget?.end_date || latest?.target_at
-  const countdownLabel = polymarketTarget ? 'Poly 5m resolves in' : 'Bot round resolves in'
+  const countdownLabel = polymarketTarget ? 'Poly market resolves in' : 'Bot round resolves in'
 
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">BTC 5-Min Swarm Predictor</h1>
-            <p className="text-xs text-slate-400">60 DeepSeek primary agents.</p>
+            <h1 className="text-xl font-semibold tracking-tight">BTC 1-Hour Swarm Predictor</h1>
+            <p className="text-xs text-slate-400">60 DeepSeek primary agents · horizon 1h.</p>
           </div>
           <div className="flex items-center gap-3">
             <Countdown targetAt={countdownTarget} label={countdownLabel} />

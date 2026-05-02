@@ -1,4 +1,4 @@
-"""Historical backtesting harness for the BTC 5-minute direction workflow."""
+"""Historical backtesting harness for the BTC 1-hour direction workflow."""
 
 from __future__ import annotations
 
@@ -163,12 +163,12 @@ def _technical_signals(candles: list[dict[str, Any]]) -> list[Signal]:
 
     if len(closes) >= 6:
         ret_5 = (close - closes[-6]) / closes[-6] * 10_000
-        if ret_5 > 2:
-            signals.append(Signal("UP", _confidence(ret_5, 12), "positive five-minute momentum"))
-        elif ret_5 < -2:
-            signals.append(Signal("DOWN", _confidence(ret_5, 12), "negative five-minute momentum"))
+        if ret_5 > 5:
+            signals.append(Signal("UP", _confidence(ret_5, 25), "positive recent momentum"))
+        elif ret_5 < -5:
+            signals.append(Signal("DOWN", _confidence(ret_5, 25), "negative recent momentum"))
         else:
-            signals.append(Signal("ABSTAIN", 0.0, "five-minute momentum muted"))
+            signals.append(Signal("ABSTAIN", 0.0, "recent momentum muted"))
 
     if len(candles) >= 21:
         prior_high = max(c["high"] for c in candles[-21:-1])
@@ -208,29 +208,46 @@ def _max_drawdown(equity_curve: list[float]) -> float:
     return max_dd
 
 
+_INTERVAL_MINUTES = {
+    "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30,
+    "1h": 60, "2h": 120, "4h": 240, "6h": 360, "8h": 480, "12h": 720, "1d": 1440,
+}
+
+
 async def run_backtest(
     *,
     symbol: str = "BTCUSDT",
+    interval: str = "1h",
     lookback: int = 240,
-    horizon_minutes: int = 5,
+    horizon_minutes: int = 60,
     threshold_bps: float = 0.0,
     fee_bps: float = 0.0,
 ) -> dict[str, Any]:
-    """Run a deterministic historical harness over recent 1-minute Binance candles."""
+    """Run a deterministic historical harness over recent Binance candles.
+
+    Default: interval=1h with horizon=1 candle (1 hour ahead).
+    """
     if lookback < 20:
         raise ValueError("lookback must be at least 20")
     if horizon_minutes < 1:
         raise ValueError("horizon_minutes must be at least 1")
     if threshold_bps < 0 or fee_bps < 0:
         raise ValueError("threshold_bps and fee_bps cannot be negative")
+    interval = interval.lower()
+    if interval not in _INTERVAL_MINUTES:
+        raise ValueError(f"unsupported interval {interval}")
 
-    limit = min(_MAX_BINANCE_LIMIT, lookback + horizon_minutes + _WARMUP_CANDLES)
-    candles = await _fetch_klines(symbol.upper(), "1m", limit)
-    if len(candles) < _WARMUP_CANDLES + horizon_minutes + 1:
+    interval_min = _INTERVAL_MINUTES[interval]
+    horizon_periods = max(1, round(horizon_minutes / interval_min))
+    effective_horizon_min = horizon_periods * interval_min
+
+    limit = min(_MAX_BINANCE_LIMIT, lookback + horizon_periods + _WARMUP_CANDLES)
+    candles = await _fetch_klines(symbol.upper(), interval, limit)
+    if len(candles) < _WARMUP_CANDLES + horizon_periods + 1:
         raise ValueError("not enough candles returned for backtest")
 
-    start_idx = max(_WARMUP_CANDLES, len(candles) - lookback - horizon_minutes)
-    end_idx = len(candles) - horizon_minutes
+    start_idx = max(_WARMUP_CANDLES, len(candles) - lookback - horizon_periods)
+    end_idx = len(candles) - horizon_periods
 
     rows: list[dict[str, Any]] = []
     equity_curve: list[float] = []
@@ -243,7 +260,7 @@ async def run_backtest(
     for idx in range(start_idx, end_idx):
         window = candles[: idx + 1]
         entry = candles[idx]["close"]
-        target = candles[idx + horizon_minutes]["close"]
+        target = candles[idx + horizon_periods]["close"]
         move_bps = (target - entry) / entry * 10_000 if entry else 0.0
 
         if move_bps > threshold_bps:
@@ -287,7 +304,7 @@ async def run_backtest(
         rows.append(
             {
                 "time": _ms_to_iso(candles[idx]["close_time"]),
-                "target_time": _ms_to_iso(candles[idx + horizon_minutes]["close_time"]),
+                "target_time": _ms_to_iso(candles[idx + horizon_periods]["close_time"]),
                 "entry_price": round(entry, 2),
                 "target_price": round(target, 2),
                 "move_bps": round(move_bps, 2),
@@ -314,9 +331,10 @@ async def run_backtest(
     return {
         "config": {
             "symbol": symbol.upper(),
-            "interval": "1m",
+            "interval": interval,
             "lookback": lookback,
-            "horizon_minutes": horizon_minutes,
+            "horizon_minutes": effective_horizon_min,
+            "horizon_periods": horizon_periods,
             "threshold_bps": threshold_bps,
             "fee_bps": fee_bps,
         },

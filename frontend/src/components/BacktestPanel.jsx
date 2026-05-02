@@ -31,8 +31,9 @@ function badge(text) {
 
 export default function BacktestPanel({ result, running, error, onRun }) {
   const [form, setForm] = useState({
+    interval: '1h',
     lookback: 240,
-    horizon_minutes: 5,
+    horizon_minutes: 60,
     threshold_bps: 0,
     fee_bps: 0,
   })
@@ -42,6 +43,7 @@ export default function BacktestPanel({ result, running, error, onRun }) {
   const submit = (event) => {
     event.preventDefault()
     onRun({
+      interval: form.interval,
       lookback: Number(form.lookback),
       horizon_minutes: Number(form.horizon_minutes),
       threshold_bps: Number(form.threshold_bps),
@@ -62,9 +64,22 @@ export default function BacktestPanel({ result, running, error, onRun }) {
       <div className="px-6 py-4 border-b border-slate-800 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-xs uppercase tracking-wider text-slate-400">Backtesting harness</div>
-          <div className="text-sm text-slate-500 mt-1">Historical 1m Binance candles, deterministic technical-signal proxy.</div>
+          <div className="text-sm text-slate-500 mt-1">Historical Binance candles, deterministic technical-signal proxy.</div>
         </div>
-        <form onSubmit={submit} className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <form onSubmit={submit} className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <label className="text-xs text-slate-400">
+            Interval
+            <select
+              value={form.interval}
+              onChange={(e) => update('interval', e.target.value)}
+              className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-sm text-slate-100"
+            >
+              <option value="15m">15m</option>
+              <option value="1h">1h</option>
+              <option value="4h">4h</option>
+              <option value="1d">1d</option>
+            </select>
+          </label>
           <label className="text-xs text-slate-400">
             Lookback
             <input
@@ -77,11 +92,11 @@ export default function BacktestPanel({ result, running, error, onRun }) {
             />
           </label>
           <label className="text-xs text-slate-400">
-            Horizon
+            Horizon (min)
             <input
               type="number"
               min="1"
-              max="30"
+              max="1440"
               value={form.horizon_minutes}
               onChange={(e) => update('horizon_minutes', e.target.value)}
               className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-sm text-slate-100"

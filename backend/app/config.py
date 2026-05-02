@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     polymarket_clob_url: str = "https://clob.polymarket.com"
 
     database_url: str = "sqlite+aiosqlite:///./data/predictions.db"
-    prediction_interval_minutes: int = 5
+    prediction_interval_minutes: int = 60
     agent_concurrency: int = 10
     agent_timeout_seconds: int = 45
     swarm_aggregation_mode: str = "primary_confirm"

@@ -152,7 +152,9 @@ async def run_prediction_round() -> int:
             category_breakdown=agg["category_breakdown"],
             market_snapshot={
                 "price": snapshot["price"],
-                "pct_change_1m": snapshot["pct_change_1m"],
+                "horizon": snapshot.get("horizon", "1h"),
+                "pct_change_1h": snapshot.get("pct_change_1h"),
+                "pct_change_15m": snapshot.get("pct_change_15m"),
                 "pct_change_24h": snapshot["pct_change_24h"],
                 "indicators": snapshot["indicators"],
                 "depth_summary": snapshot["depth_summary"],
