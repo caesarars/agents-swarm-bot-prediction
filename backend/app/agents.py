@@ -338,16 +338,56 @@ _SPECIALISTS: list[tuple[str, str, str]] = [
 ]
 
 
+_PROVIDER_MODEL_SETTING = {
+    "deepseek": "deepseek_model",
+    "anthropic": "anthropic_model",
+    "gemini": "gemini_model",
+}
+
+_PROVIDER_LABEL = {
+    "deepseek": "DS",
+    "anthropic": "Claude",
+    "gemini": "Gemini",
+}
+
+
+def _build_provider_sequence() -> list[str]:
+    """Return a 60-element provider assignment matching _SPECIALISTS order.
+
+    Distribution within each lens of 10 specialists:
+      - Technical Analysis, Price Action, Statistics, Sentiment: 5 DS / 3 Claude / 2 Gemini
+      - Order Book, Futures: 5 DS / 4 Claude / 1 Gemini
+
+    Total: 30 DeepSeek, 20 Claude, 10 Gemini.
+    Each provider appears across every lens so that error correlation is reduced
+    not just at the swarm level but inside each analytical bucket.
+    """
+    seq: list[str] = []
+    # _SPECIALISTS order is: TA, PA, OB, Futures, Stats, Sentiment (10 each).
+    pattern_by_lens_idx = {
+        0: (5, 3, 2),  # TA
+        1: (5, 3, 2),  # PA
+        2: (5, 4, 1),  # OB
+        3: (5, 4, 1),  # Futures
+        4: (5, 3, 2),  # Stats
+        5: (5, 3, 2),  # Sentiment
+    }
+    for lens_idx in range(6):
+        ds, ant, gem = pattern_by_lens_idx[lens_idx]
+        seq += ["deepseek"] * ds + ["anthropic"] * ant + ["gemini"] * gem
+    return seq
+
+
 def _agent(
     id_: int,
     category: str,
     specialist: str,
     lens: str,
-    provider: str = "deepseek",
-    provider_label: str = "",
+    provider: str,
 ) -> Agent:
-    model_setting = "anthropic_model" if provider == "anthropic" else "deepseek_model"
-    name = f"{provider_label} / {specialist}" if provider_label else specialist
+    model_setting = _PROVIDER_MODEL_SETTING[provider]
+    label = _PROVIDER_LABEL[provider]
+    name = f"{label} / {specialist}"
     return Agent(
         id=id_,
         name=name,
@@ -359,18 +399,14 @@ def _agent(
 
 
 def _build_agents() -> list[Agent]:
-    agents: list[Agent] = []
-    next_id = 1
-    for category, specialist, lens in _SPECIALISTS:
-        agents.append(
-            _agent(
-                next_id,
-                category,
-                specialist,
-                lens,
-            )
+    providers = _build_provider_sequence()
+    if len(providers) != len(_SPECIALISTS):
+        raise RuntimeError(
+            f"provider sequence length {len(providers)} mismatched with specialists {len(_SPECIALISTS)}"
         )
-        next_id += 1
+    agents: list[Agent] = []
+    for idx, (category, specialist, lens) in enumerate(_SPECIALISTS):
+        agents.append(_agent(idx + 1, category, specialist, lens, providers[idx]))
     return agents
 
 
@@ -378,6 +414,11 @@ ALL_AGENTS: list[Agent] = _build_agents()
 
 assert len(ALL_AGENTS) == 60, f"Expected 60 agents, got {len(ALL_AGENTS)}"
 assert len({a.id for a in ALL_AGENTS}) == len(ALL_AGENTS), "Agent IDs must be unique"
+
+_PROVIDER_COUNTS = {p: sum(1 for a in ALL_AGENTS if a.provider == p) for p in _PROVIDER_MODEL_SETTING}
+assert _PROVIDER_COUNTS == {"deepseek": 30, "anthropic": 20, "gemini": 10}, (
+    f"unexpected provider distribution: {_PROVIDER_COUNTS}"
+)
 
 
 def get_all_agents() -> list[Agent]:

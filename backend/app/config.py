@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     swarm_primary_min_margin: float = 1.5
     swarm_override_margin: float = 4.0
     swarm_deepseek_weight: float = 1.0
-    swarm_anthropic_weight: float = 0.0
-    swarm_gemini_weight: float = 0.0
+    swarm_anthropic_weight: float = 1.0
+    swarm_gemini_weight: float = 1.0
     learning_enabled: bool = True
     learning_lookback: int = 200
     learning_min_agent_samples: int = 8
