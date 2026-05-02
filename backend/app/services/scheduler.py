@@ -35,10 +35,10 @@ def start_scheduler() -> AsyncIOScheduler:
 
     _scheduler = AsyncIOScheduler(timezone="UTC")
 
-    # Predict at the top of every hour, second 30, so the 1h candle has just closed.
+    # Predict every 15 minutes, second 30, so the 15m candle has just closed.
     _scheduler.add_job(
         _job_predict_safely,
-        CronTrigger(minute="0", second="30"),
+        CronTrigger(minute="*/15", second="30"),
         id="predict_round",
         max_instances=1,
         coalesce=True,
@@ -48,7 +48,7 @@ def start_scheduler() -> AsyncIOScheduler:
     # Settle every minute is cheap and only acts when target_at has passed.
     _scheduler.add_job(
         _job_settle_safely,
-        CronTrigger(minute="*/5", second="40"),
+        CronTrigger(second="40"),
         id="settle_round",
         max_instances=1,
         coalesce=True,

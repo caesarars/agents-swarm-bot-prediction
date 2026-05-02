@@ -170,24 +170,24 @@ def _compact_candles(candles: list[dict]) -> list[dict]:
 async def get_market_snapshot(symbol: str = "BTCUSDT") -> dict:
     """Build a single JSON snapshot used as user prompt for every agent.
 
-    Horizon target: 1 hour. Primary timeframe = 1h, intraday context = 15m.
-    Indicators are computed on 1h closes so they are aligned with the prediction horizon.
+    Horizon target: 15 minutes. Primary timeframe = 15m, intraday context = 5m.
+    Indicators are computed on 15m closes so they are aligned with the prediction horizon.
     """
     async with httpx.AsyncClient(timeout=_BINANCE_TIMEOUT) as client:
         import asyncio
 
-        klines_1h, klines_15m, ticker, book, depth = await asyncio.gather(
-            _fetch_klines(client, symbol, "1h", 60),
-            _fetch_klines(client, symbol, "15m", 24),
+        klines_15m, klines_5m, ticker, book, depth = await asyncio.gather(
+            _fetch_klines(client, symbol, "15m", 60),
+            _fetch_klines(client, symbol, "5m", 24),
             _fetch_ticker(client, symbol),
             _fetch_book_ticker(client, symbol),
             _fetch_depth(client, symbol, 20),
         )
 
-    closes = [k["close"] for k in klines_1h]
-    highs = [k["high"] for k in klines_1h]
-    lows = [k["low"] for k in klines_1h]
-    vols = [k["volume"] for k in klines_1h]
+    closes = [k["close"] for k in klines_15m]
+    highs = [k["high"] for k in klines_15m]
+    lows = [k["low"] for k in klines_15m]
+    vols = [k["volume"] for k in klines_15m]
 
     rsi14 = indicators.rsi(closes, 14)
     ema9 = indicators.ema(closes, 9)
@@ -200,12 +200,12 @@ async def get_market_snapshot(symbol: str = "BTCUSDT") -> dict:
 
     last_close = closes[-1]
     prior_close = closes[-2] if len(closes) >= 2 else last_close
-    pct_1h = (last_close - prior_close) / prior_close * 100 if prior_close else 0.0
+    pct_15m = (last_close - prior_close) / prior_close * 100 if prior_close else 0.0
 
-    closes_15m = [k["close"] for k in klines_15m]
-    pct_15m = 0.0
-    if len(closes_15m) >= 2 and closes_15m[-2]:
-        pct_15m = (closes_15m[-1] - closes_15m[-2]) / closes_15m[-2] * 100
+    closes_5m = [k["close"] for k in klines_5m]
+    pct_5m = 0.0
+    if len(closes_5m) >= 2 and closes_5m[-2]:
+        pct_5m = (closes_5m[-1] - closes_5m[-2]) / closes_5m[-2] * 100
 
     window_high = max(highs[-20:]) if len(highs) >= 1 else None
     window_low = min(lows[-20:]) if len(lows) >= 1 else None
@@ -216,10 +216,10 @@ async def get_market_snapshot(symbol: str = "BTCUSDT") -> dict:
 
     return {
         "symbol": symbol,
-        "horizon": "1h",
+        "horizon": "15m",
         "price": last_close,
-        "pct_change_1h": round(pct_1h, 4),
         "pct_change_15m": round(pct_15m, 4),
+        "pct_change_5m": round(pct_5m, 4),
         "pct_change_24h": float(ticker.get("priceChangePercent", 0)) if ticker else None,
         "high_24h": float(ticker["highPrice"]) if ticker else None,
         "low_24h": float(ticker["lowPrice"]) if ticker else None,
@@ -244,8 +244,8 @@ async def get_market_snapshot(symbol: str = "BTCUSDT") -> dict:
             "window_high_20": window_high,
             "window_low_20": window_low,
         },
-        "candles_1h": _compact_candles(klines_1h[-30:]),
-        "candles_15m": _compact_candles(klines_15m[-16:]),
+        "candles_15m": _compact_candles(klines_15m[-30:]),
+        "candles_5m": _compact_candles(klines_5m[-16:]),
         "sentiment": {"fear_and_greed": fng},
         "futures": futures,
     }

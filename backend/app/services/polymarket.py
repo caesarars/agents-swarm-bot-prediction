@@ -1,7 +1,7 @@
 """Polymarket public Gamma API client.
 
-Pulls active BTC up/down style markets, preferring those that resolve in the next
-1 hour to ~3 days (matching the 1-hour swarm horizon).
+Pulls active BTC up/down style markets, preferring those that resolve closest to
+15 minutes from now (matching the 15-minute swarm horizon).
 The Gamma API is public; the API key is included as Bearer for higher rate limits if provided.
 """
 
@@ -76,21 +76,21 @@ def _parse_end_date(value: Any) -> datetime | None:
 
 
 def _is_in_target_window(end_date: Any) -> bool:
-    """Match markets that resolve from now up to ~3 days out (1h horizon-friendly)."""
+    """Match markets that resolve soon enough to be relevant for a 15m horizon."""
     parsed = _parse_end_date(end_date)
     if parsed is None:
         return False
     now = datetime.now(timezone.utc)
-    return now - timedelta(minutes=5) <= parsed <= now + timedelta(days=3)
+    return now - timedelta(minutes=2) <= parsed <= now + timedelta(hours=3)
 
 
 def _horizon_score(market: dict[str, Any]) -> float:
-    """Lower is better. Prefers markets ending closest to ~1 hour ahead."""
+    """Lower is better. Prefers markets ending closest to ~15 minutes ahead."""
     parsed = _parse_end_date(market.get("end_date"))
     if parsed is None:
         return 1e9
     delta_minutes = (parsed - datetime.now(timezone.utc)).total_seconds() / 60.0
-    target = 60.0  # minutes
+    target = 15.0  # minutes
     if delta_minutes < 0:
         return 1e6 + abs(delta_minutes)
     return abs(delta_minutes - target)
@@ -104,7 +104,7 @@ async def _fetch_json(client: httpx.AsyncClient, path: str, params: dict[str, An
 
 
 async def search_btc_short_term_markets(limit: int = 8) -> list[dict[str, Any]]:
-    """Surface active BTC up/down style markets, ordered by closeness to a 1h horizon."""
+    """Surface active BTC up/down style markets, ordered by closeness to a 15m horizon."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             broad = _as_list(

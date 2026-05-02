@@ -31,9 +31,9 @@ function badge(text) {
 
 export default function BacktestPanel({ result, running, error, onRun }) {
   const [form, setForm] = useState({
-    interval: '1h',
+    interval: '15m',
     lookback: 240,
-    horizon_minutes: 60,
+    horizon_minutes: 15,
     threshold_bps: 0,
     fee_bps: 0,
   })

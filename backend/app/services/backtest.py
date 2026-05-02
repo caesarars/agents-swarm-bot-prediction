@@ -1,4 +1,4 @@
-"""Historical backtesting harness for the BTC 1-hour direction workflow."""
+"""Historical backtesting harness for the BTC 15-minute direction workflow."""
 
 from __future__ import annotations
 
@@ -217,15 +217,15 @@ _INTERVAL_MINUTES = {
 async def run_backtest(
     *,
     symbol: str = "BTCUSDT",
-    interval: str = "1h",
+    interval: str = "15m",
     lookback: int = 240,
-    horizon_minutes: int = 60,
+    horizon_minutes: int = 15,
     threshold_bps: float = 0.0,
     fee_bps: float = 0.0,
 ) -> dict[str, Any]:
     """Run a deterministic historical harness over recent Binance candles.
 
-    Default: interval=1h with horizon=1 candle (1 hour ahead).
+    Default: interval=15m with horizon=1 candle (15 minutes ahead).
     """
     if lookback < 20:
         raise ValueError("lookback must be at least 20")

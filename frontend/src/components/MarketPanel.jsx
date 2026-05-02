@@ -44,7 +44,7 @@ export default function MarketPanel({ snapshot, status }) {
       </div>
       <div className="text-3xl font-bold font-mono">${fmt(snapshot.price, 2)}</div>
       <div className={`text-sm font-mono ${snapshot.pct_change_24h >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-        24h {fmt(snapshot.pct_change_24h, 2)}% &middot; 1h {fmt(snapshot.pct_change_1h, 3)}% &middot; 15m {fmt(snapshot.pct_change_15m, 3)}%
+        24h {fmt(snapshot.pct_change_24h, 2)}% &middot; 15m {fmt(snapshot.pct_change_15m, 3)}% &middot; 5m {fmt(snapshot.pct_change_5m, 3)}%
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-1">

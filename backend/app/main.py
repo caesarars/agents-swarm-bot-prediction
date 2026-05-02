@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="BTC 1-Hour Swarm Predictor",
-        description="DeepSeek-powered grounded AI agents predicting BTC up/down for the next 1 hour.",
+        title="BTC 15-Min Swarm Predictor",
+        description="Grounded AI agents predicting BTC up/down for the next 15 minutes.",
         version="1.0.0",
         lifespan=lifespan,
     )

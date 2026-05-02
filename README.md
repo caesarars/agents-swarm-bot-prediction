@@ -1,16 +1,16 @@
-# BTC 5-Min Swarm Predictor
+# BTC 15-Min Swarm Predictor
 
-Full-stack web app yang memprediksi arah BTC/USDT (UP/DOWN) untuk 5 menit ke depan
-menggunakan **50 DeepSeek primary agent** dan **20 Claude Haiku validator agent**.
+Full-stack web app yang memprediksi arah BTC/USDT (UP/DOWN) untuk 15 menit ke depan
+menggunakan **60 grounded agents**: 30 DeepSeek, 20 Claude Haiku, dan 10 Gemini.
 Hasil swarm ditampilkan di dashboard real-time bersama data pasar Binance dan referensi
 pasar prediksi **Polymarket**.
 
 ## Arsitektur
 
 ```
-┌──────────────┐   /api    ┌─────────────────────────────┐   DeepSeek + Haiku validators
-│  React/Vite  │ ────────▶ │   FastAPI backend           │ ─────────────▶  80 grounded agents
-│  Tailwind UI │           │  - APScheduler (5m)         │
+┌──────────────┐   /api    ┌─────────────────────────────┐   DeepSeek + Claude + Gemini
+│  React/Vite  │ ────────▶ │   FastAPI backend           │ ─────────────▶  60 grounded agents
+│  Tailwind UI │           │  - APScheduler (15m)        │
 └──────────────┘           │  - Binance spot + futures   │
                            │  - SQLite (predictions DB)  │
                            │  - Polymarket Gamma API     │
@@ -18,27 +18,26 @@ pasar prediksi **Polymarket**.
 ```
 
 ### Alur kerja
-1. Setiap 5 menit (`*/5 second 5`), scheduler mengambil snapshot pasar BTC/USDT
-   (harga, 30 candle 1m, 12 candle 5m, RSI/MACD/EMA/Bollinger/ATR/VWAP, depth,
+1. Setiap 15 menit (`minute=*/15, second=30`), scheduler mengambil snapshot pasar BTC/USDT
+   (harga, 30 candle 15m, 16 candle 5m, RSI/MACD/EMA/Bollinger/ATR/VWAP, depth,
    Binance Futures premium/funding/open interest, FNG).
-2. Snapshot dikirim ke 80 agent secara paralel dengan semaphore (default 10 concurrent).
+2. Snapshot dikirim ke 60 agent secara paralel dengan semaphore (default 10 concurrent).
 3. Tiap agent membalas JSON `{prediction, confidence, reasoning}`.
 4. Hasil diagregasi (UP/DOWN/ABSTAIN, avg confidence, breakdown per kategori) dan disimpan.
 5. Setiap menit, scheduler menyelesaikan ronde yang `target_at`-nya sudah lewat dengan
    membandingkan harga aktual ⇒ menulis `actual_outcome` & `is_correct` (live backtest).
-6. Backtesting harness dapat dijalankan on-demand terhadap candle historis 1m Binance tanpa
+6. Backtesting harness dapat dijalankan on-demand terhadap candle historis 15m Binance tanpa
    memanggil DeepSeek, memakai proxy sinyal teknikal deterministik untuk validasi cepat.
 
 ## Agent Swarm
 Lihat [`backend/app/agents.py`](backend/app/agents.py). Roster saat ini:
-- 5 lensa yang sesuai dengan snapshot: Technical Analysis, Price Action, Order Book, Statistics, Sentiment.
-- 60 DeepSeek primary agent: 10 specialist per lensa termasuk Futures.
-- 20 Claude Haiku validator agent dari subset lensa Technical Analysis dan Price Action.
-- 10 Futures specialist memakai Binance Futures public data.
-- Aggregator memakai `primary_confirm`: DeepSeek tetap primary, Haiku hanya validator berbobot lebih kecil.
+- 6 lensa yang sesuai dengan snapshot: Technical Analysis, Price Action, Order Book, Futures, Statistics, Sentiment.
+- 60 agent total: 30 DeepSeek, 20 Claude Haiku, 10 Gemini.
+- 10 specialist per lensa, termasuk Futures specialist yang memakai Binance Futures public data.
+- Aggregator memakai `primary_confirm`: DeepSeek tetap primary, Claude/Gemini menjadi validator berbobot.
 
-Agent on-chain, derivatives, dan macro dihapus dari swarm karena snapshot belum menyediakan
-SOPR, funding rate, open interest, liquidation levels, DXY, SPX, atau feed sejenis. Ini
+Agent on-chain, macro, options, liquidations, dan news dihapus dari swarm karena snapshot belum menyediakan
+SOPR, liquidation levels, DXY, SPX, news feed, atau feed sejenis. Ini
 mengurangi noise dari agent yang sebelumnya berisiko mengarang data.
 
 ## Setup
@@ -61,22 +60,22 @@ uvicorn app.main:app --reload --port 8000
 
 Endpoint penting:
 - `GET /health`
-- `GET /api/agents` — daftar 80 agent
+- `GET /api/agents` — daftar 60 agent
 - `GET /api/predictions/latest`
 - `GET /api/predictions/history?limit=50`
 - `GET /api/predictions/{id}/votes`
 - `GET /api/stats`
 - `GET /api/learning/performance`
-- `GET /api/backtest?lookback=240&horizon_minutes=5&threshold_bps=0&fee_bps=0`
+- `GET /api/backtest?lookback=240&interval=15m&horizon_minutes=15&threshold_bps=0&fee_bps=0`
 - `GET /api/market/snapshot`
 - `GET /api/polymarket/btc`
-- `POST /api/predict/run` — jalankan ronde manual (gunakan untuk first-run sebelum 5 menit pertama)
+- `POST /api/predict/run` — jalankan ronde manual (gunakan untuk first-run sebelum 15 menit pertama)
 - `POST /api/predict/settle` — selesaikan ronde yang target_at-nya sudah lewat
 
 Backtesting harness mengembalikan metrik `accuracy`, `coverage`, `cumulative_return_bps`,
 `max_drawdown_bps`, `profit_factor`, dan 100 baris hasil terbaru. Parameter:
-- `lookback` — jumlah candle 1m yang dievaluasi, 20-900.
-- `horizon_minutes` — jarak target harga, default 5 menit.
+- `lookback` — jumlah candle 15m yang dievaluasi, 20-900.
+- `horizon_minutes` — jarak target harga, default 15 menit.
 - `threshold_bps` — zona netral untuk actual outcome; `0` berarti semua pergerakan dihitung.
 - `fee_bps` — biaya per trade simulasi dalam basis point.
 
@@ -114,6 +113,6 @@ Backend: http://localhost:8000 — Frontend: http://localhost:5173
 
 ## Catatan & disclaimer
 - Polymarket Gamma API public; kunci hanya untuk rate limit yang lebih tinggi.
-- Kontrak spesifik "BTC up/down 5 menit" tidak selalu tersedia di Polymarket. App
+- Kontrak spesifik "BTC up/down 15 menit" tidak selalu tersedia di Polymarket. App
   menampilkan market BTC short-term aktif sebagai referensi.
 - Ini adalah riset / dashboard edukasi — bukan saran finansial.
