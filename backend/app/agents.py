@@ -1,4 +1,4 @@
-"""Grounded agent roster with DeepSeek primary agents and Haiku validators.
+"""Grounded agent roster with DeepSeek primary agents.
 
 Agents that require unavailable feeds (on-chain, macro, options, liquidations,
 funding/OI) are excluded until those feeds are added.
@@ -368,24 +368,12 @@ def _build_agents() -> list[Agent]:
             )
         )
         next_id += 1
-    for category, specialist, lens in _SPECIALISTS[:20]:
-        agents.append(
-            _agent(
-                next_id,
-                category,
-                specialist,
-                lens,
-                provider="anthropic",
-                provider_label="Haiku Validator",
-            )
-        )
-        next_id += 1
     return agents
 
 
 ALL_AGENTS: list[Agent] = _build_agents()
 
-assert len(ALL_AGENTS) == 80, f"Expected 80 agents, got {len(ALL_AGENTS)}"
+assert len(ALL_AGENTS) == 60, f"Expected 60 agents, got {len(ALL_AGENTS)}"
 assert len({a.id for a in ALL_AGENTS}) == len(ALL_AGENTS), "Agent IDs must be unique"
 
 

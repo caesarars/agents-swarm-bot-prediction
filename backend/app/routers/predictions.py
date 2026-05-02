@@ -42,6 +42,7 @@ async def list_agents() -> list[dict[str, Any]]:
             "category": a.category,
             "provider": a.provider,
             "model": str(getattr(settings, a.model_setting, a.model_setting)),
+            "role": a.system_prompt.split("Your analytical lens: ")[-1] if "Your analytical lens: " in a.system_prompt else "",
         }
         for a in get_all_agents()
     ]

@@ -9,9 +9,9 @@ pasar prediksi **Polymarket**.
 
 ```
 ┌──────────────┐   /api    ┌─────────────────────────────┐   DeepSeek + Haiku validators
-│  React/Vite  │ ────────▶ │   FastAPI backend           │ ─────────────▶  70 grounded agents
+│  React/Vite  │ ────────▶ │   FastAPI backend           │ ─────────────▶  80 grounded agents
 │  Tailwind UI │           │  - APScheduler (5m)         │
-└──────────────┘           │  - Binance market snapshot  │
+└──────────────┘           │  - Binance spot + futures   │
                            │  - SQLite (predictions DB)  │
                            │  - Polymarket Gamma API     │
                            └─────────────────────────────┘
@@ -19,8 +19,9 @@ pasar prediksi **Polymarket**.
 
 ### Alur kerja
 1. Setiap 5 menit (`*/5 second 5`), scheduler mengambil snapshot pasar BTC/USDT
-   (harga, 30 candle 1m, 12 candle 5m, RSI/MACD/EMA/Bollinger/ATR/VWAP, depth, FNG).
-2. Snapshot dikirim ke 70 agent secara paralel dengan semaphore (default 10 concurrent).
+   (harga, 30 candle 1m, 12 candle 5m, RSI/MACD/EMA/Bollinger/ATR/VWAP, depth,
+   Binance Futures premium/funding/open interest, FNG).
+2. Snapshot dikirim ke 80 agent secara paralel dengan semaphore (default 10 concurrent).
 3. Tiap agent membalas JSON `{prediction, confidence, reasoning}`.
 4. Hasil diagregasi (UP/DOWN/ABSTAIN, avg confidence, breakdown per kategori) dan disimpan.
 5. Setiap menit, scheduler menyelesaikan ronde yang `target_at`-nya sudah lewat dengan
@@ -31,8 +32,9 @@ pasar prediksi **Polymarket**.
 ## Agent Swarm
 Lihat [`backend/app/agents.py`](backend/app/agents.py). Roster saat ini:
 - 5 lensa yang sesuai dengan snapshot: Technical Analysis, Price Action, Order Book, Statistics, Sentiment.
-- 50 DeepSeek primary agent: 10 specialist per lensa.
+- 60 DeepSeek primary agent: 10 specialist per lensa termasuk Futures.
 - 20 Claude Haiku validator agent dari subset lensa Technical Analysis dan Price Action.
+- 10 Futures specialist memakai Binance Futures public data.
 - Aggregator memakai `primary_confirm`: DeepSeek tetap primary, Haiku hanya validator berbobot lebih kecil.
 
 Agent on-chain, derivatives, dan macro dihapus dari swarm karena snapshot belum menyediakan
@@ -59,7 +61,7 @@ uvicorn app.main:app --reload --port 8000
 
 Endpoint penting:
 - `GET /health`
-- `GET /api/agents` — daftar 70 agent
+- `GET /api/agents` — daftar 80 agent
 - `GET /api/predictions/latest`
 - `GET /api/predictions/history?limit=50`
 - `GET /api/predictions/{id}/votes`
@@ -108,6 +110,7 @@ Backend: http://localhost:8000 — Frontend: http://localhost:5173
 - `LEARNING_MIN_AGENT_SAMPLES=8` — minimal sampel sebelum bobot agent dipakai.
 - `LEARNING_MIN_WEIGHT=0.35`, `LEARNING_MAX_WEIGHT=1.8` — batas bobot agar learning tidak overfit.
 - Bobot dihitung dari akurasi historis per agent, category, dan provider, lalu disimpan di `market_snapshot.aggregation.learning`.
+- Dashboard menampilkan top/bottom weighted agents dan bobot kategori dari `GET /api/learning/performance`.
 
 ## Catatan & disclaimer
 - Polymarket Gamma API public; kunci hanya untuk rate limit yang lebih tinggi.
