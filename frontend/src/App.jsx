@@ -103,6 +103,11 @@ export default function App() {
   }
 
   const accuracyPct = stats?.accuracy != null ? (stats.accuracy * 100).toFixed(1) : '—'
+  const polymarketTarget = (polymarket || [])
+    .filter((m) => m?.end_date && new Date(m.end_date).getTime() > Date.now() - 15000)
+    .sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime())[0]
+  const countdownTarget = polymarketTarget?.end_date || latest?.target_at
+  const countdownLabel = polymarketTarget ? 'Poly 5m resolves in' : 'Bot round resolves in'
 
   return (
     <div className="min-h-screen">
@@ -110,10 +115,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">BTC 5-Min Swarm Predictor</h1>
-            <p className="text-xs text-slate-400">50 grounded DeepSeek agents using only data present in the snapshot.</p>
+            <p className="text-xs text-slate-400">50 DeepSeek primary agents plus 20 Haiku validators.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Countdown targetAt={latest?.target_at} />
+            <Countdown targetAt={countdownTarget} label={countdownLabel} />
             <button
               onClick={runNow}
               disabled={running}
